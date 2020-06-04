@@ -6,18 +6,39 @@ using namespace std;
 
 namespace runas {
 
+void UTF82ASC(const char* szUTF8, std::string& szAscii) {
+  int len = MultiByteToWideChar(CP_UTF8, 0, szUTF8, -1, NULL,0); 
+  wchar_t * wszUtf8 = new wchar_t[len+1]; 
+  memset(wszUtf8, 0, len * 2 + 2); 
+  MultiByteToWideChar(CP_UTF8, 0, szUTF8, -1, wszUtf8, len); 
+  len = WideCharToMultiByte(CP_ACP, 0, wszUtf8, -1, NULL, 0, NULL, NULL); 
+  char *szTemp = new char[len + 1]; 
+  memset(szTemp, 0, len + 1); 
+  WideCharToMultiByte (CP_ACP, 0, wszUtf8, -1, szTemp, len, NULL,NULL); 
+	
+  szAscii = szTemp;
+  delete[] szTemp;
+  delete[] wszUtf8; 
+}
+
 std::string QuoteCmdArg(const std::string& arg) {
   if (arg.size() == 0)
     return arg;
 
+  std::string argAsc;
+
   // No quotation needed.
-  if (arg.find_first_of(" \t\"") == std::string::npos)
-    return arg;
+  if (arg.find_first_of(" \t\"") == std::string::npos) {
+    UTF82ASC(arg.c_str(), argAsc);
+    return argAsc;
+  }
 
   // No embedded double quotes or backlashes, just wrap quote marks around
   // the whole thing.
-  if (arg.find_first_of("\"\\") == std::string::npos)
-    return std::string("\"") + arg + '"';
+  if (arg.find_first_of("\"\\") == std::string::npos) {
+    UTF82ASC((std::string("\"") + argAsc + '"').c_str(), argAsc);
+    return argAsc;
+  }
 
   // Expected input/output:
   //   input : hello"world
@@ -48,23 +69,8 @@ std::string QuoteCmdArg(const std::string& arg) {
       quote_hit = false;
     }
   }
-
-  return std::string("\"") + std::string(quoted.rbegin(), quoted.rend()) + '"';
-}
-  
-void UTF82ASC(const char* szUTF8, std::string& szAscii) {
-  int len = MultiByteToWideChar(CP_UTF8, 0, szUTF8, -1, NULL,0); 
-  wchar_t * wszUtf8 = new wchar_t[len+1]; 
-  memset(wszUtf8, 0, len * 2 + 2); 
-  MultiByteToWideChar(CP_UTF8, 0, szUTF8, -1, wszUtf8, len); 
-  len = WideCharToMultiByte(CP_ACP, 0, wszUtf8, -1, NULL, 0, NULL, NULL); 
-  char *szTemp = new char[len + 1]; 
-  memset(szTemp, 0, len + 1); 
-  WideCharToMultiByte (CP_ACP, 0, wszUtf8, -1, szTemp, len, NULL,NULL); 
-	
-  szAscii = szTemp;
-  delete[] szTemp;
-  delete[] wszUtf8; 
+  UTF82ASC((std::string("\"") + std::string(quoted.rbegin(), quoted.rend()) + '"').c_str(), argAsc);
+  return argAsc;
 }
 
 bool Runas(const std::string& command,
