@@ -2,6 +2,8 @@
 
 #include <windows.h>
 
+using namespace std;
+
 namespace runas {
 
 std::string QuoteCmdArg(const std::string& arg) {
@@ -49,6 +51,21 @@ std::string QuoteCmdArg(const std::string& arg) {
 
   return std::string("\"") + std::string(quoted.rbegin(), quoted.rend()) + '"';
 }
+  
+void UTF82ASC(const char* szUTF8, std::string& szAscii) {
+  int len = MultiByteToWideChar(CP_UTF8, 0, szUTF8, -1, NULL,0); 
+  wchar_t * wszUtf8 = new wchar_t[len+1]; 
+  memset(wszUtf8, 0, len * 2 + 2); 
+  MultiByteToWideChar(CP_UTF8, 0, szUTF8, -1, wszUtf8, len); 
+  len = WideCharToMultiByte(CP_ACP, 0, wszUtf8, -1, NULL, 0, NULL, NULL); 
+  char *szTemp = new char[len + 1]; 
+  memset(szTemp, 0, len + 1); 
+  WideCharToMultiByte (CP_ACP, 0, wszUtf8, -1, szTemp, len, NULL,NULL); 
+	
+  szAscii = szTemp;
+  delete[] szTemp;
+  delete[] wszUtf8; 
+}
 
 bool Runas(const std::string& command,
            const std::vector<std::string>& args,
@@ -57,13 +74,15 @@ bool Runas(const std::string& command,
            std::string* std_error,
            int options,
            int* exit_code) {
+  std::string commandAsc;
+  UTF82ASC(command.c_str(), commandAsc);
   CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
   std::string parameters;
   for (size_t i = 0; i < args.size(); ++i)
     parameters += QuoteCmdArg(args[i]) + ' ';
 
-  SHELLEXECUTEINFO sei = { sizeof(sei) };
+  SHELLEXECUTEINFOA sei = { sizeof(sei) };
   sei.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
   sei.lpVerb = (options & OPTION_ADMIN) ? "runas" : "open";
   sei.lpFile = command.c_str();
@@ -73,7 +92,7 @@ bool Runas(const std::string& command,
   if (options & OPTION_HIDE)
     sei.nShow = SW_HIDE;
 
-  if (::ShellExecuteEx(&sei) == FALSE || sei.hProcess == NULL)
+  if (::ShellExecuteExA(&sei) == FALSE || sei.hProcess == NULL)
     return false;
 
   // Wait for the process to complete.
